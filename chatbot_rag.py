@@ -1,11 +1,11 @@
-# chatbot_rag.py
+# chatbot_rag_faiss.py
 
 import os
 import streamlit as st
 import fitz  # PyMuPDF để đọc file PDF
 import google.generativeai as genai
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain.chains.question_answering import load_qa_chain
 from dotenv import load_dotenv
@@ -45,7 +45,7 @@ def get_vector_store_from_pdfs(files):
         return None
     texts = extract_text_from_pdfs(files)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = Chroma.from_texts(texts, embeddings)
+    vector_store = FAISS.from_texts(texts, embeddings)
     return vector_store
 
 # Nếu người dùng không upload, sử dụng dữ liệu mặc định (ví dụ mẫu)
@@ -62,7 +62,7 @@ default_docs = [
 @st.cache_resource
 def get_default_vector_store():
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    return Chroma.from_texts(default_docs, embeddings, persist_directory="./chroma_db")
+    return FAISS.from_texts(default_docs, embeddings)
 
 # Chọn vector store tùy theo tình huống
 vector_store = get_vector_store_from_pdfs(uploaded_files) if uploaded_files else get_default_vector_store()
