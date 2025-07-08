@@ -57,10 +57,11 @@ vector_store = get_vector_store_from_pdfs(uploaded_files)
 llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.2)
 
 prompt_template = """
-Bạn là một trợ lý thân thiện, chỉ trả lời các câu hỏi dựa trên thông tin được cung cấp trong ngữ cảnh sau.
-Nếu thông tin không có trong ngữ cảnh, vui lòng nói rằng bạn không thể tìm thấy thông tin đó.
-Bạn KHÔNG được trả lời bất kỳ câu hỏi nào nằm ngoài phạm vi của ngữ cảnh này.
-Luôn cung cấp câu trả lời rõ ràng và ngắn gọn.
+Bạn là một trợ lý AI thông minh và thân thiện. Hãy trả lời các câu hỏi dựa trên nội dung của tài liệu được cung cấp dưới đây. 
+
+Nếu thông tin cần thiết không được nêu rõ trong tài liệu, bạn có thể dùng kiến thức chung hoặc suy luận logic từ dữ kiện đã có trong tài liệu để đưa ra câu trả lời hợp lý.
+
+Hãy đảm bảo câu trả lời rõ ràng, mạch lạc, dễ hiểu và chính xác nhất có thể.
 
 Ngữ cảnh:
 {context}
@@ -72,11 +73,11 @@ Trả lời:
 """
 
 prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-qa_chain = load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
+qa_chain = load_qa_chain(llm=llm, chain_type="refine", prompt=prompt)
 
 # ----------------- 5. Hàm trả lời câu hỏi -----------------
 def get_gemini_response(question):
-    docs = vector_store.similarity_search(question, k=2)
+    docs = vector_store.similarity_search(question, k=4)
     response = qa_chain({"input_documents": docs, "question": question})
     return response["output_text"]
 
