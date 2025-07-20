@@ -73,7 +73,7 @@ Trả lời:
 """
 
 prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-qa_chain = load_qa_chain(llm=llm, chain_type="refine", prompt=prompt)
+qa_chain = load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
 
 # ----------------- 5. Hàm trả lời câu hỏi -----------------
 def get_gemini_response(question):
