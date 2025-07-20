@@ -1,7 +1,8 @@
 import os
+import json
 import streamlit as st
-import gspread
 from dotenv import load_dotenv
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain.vectorstores import FAISS
@@ -13,18 +14,24 @@ import google.generativeai as genai
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
-if not GOOGLE_API_KEY or not SHEET_ID:
-    st.error("❌ Thiếu GOOGLE_API_KEY hoặc GOOGLE_SHEET_ID trong file .env")
+if not GOOGLE_API_KEY or not SHEET_ID or not CREDENTIALS_JSON:
+    st.error("❌ Thiếu GOOGLE_API_KEY, GOOGLE_SHEET_ID hoặc GOOGLE_CREDENTIALS_JSON trong .env")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # ----------------- 1. Đọc Google Sheet -----------------
 def extract_text_from_google_sheet():
-    creds_file = "gg_config.json"
+    try:
+        creds_dict = json.loads(CREDENTIALS_JSON)
+    except Exception as e:
+        st.error(f"❌ Lỗi khi parse GOOGLE_CREDENTIALS_JSON: {e}")
+        st.stop()
+
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SHEET_ID).sheet1
 
@@ -70,6 +77,7 @@ vector_store = get_vector_store_from_sheet()
 
 # ----------------- 6. Giao diện Chat -----------------
 st.set_page_config(page_title="Chatbot Chính sách Công ty", page_icon="🤖")
+st.header("🤖 Chatbot Chính sách Công ty (Google Sheets + Gemini)")
 st.caption("💡 Dữ liệu được nạp từ Google Sheet chứa thông tin hỏi đáp chính sách.")
 
 if "messages" not in st.session_state:
