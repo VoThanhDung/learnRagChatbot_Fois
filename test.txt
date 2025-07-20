@@ -1,0 +1,78 @@
+      BẮT ĐẦU CHƯƠNG TRÌNH
+└──> 1. Import các thư viện và tải GOOGLE_API_KEY từ file .env
+     └── Nếu không có API key thì dừng lại
+
+└──> 2. Hiển thị giao diện Streamlit:
+       - Header
+       - Gợi ý upload PDF
+
+└──> 3. Người dùng tải lên 1 hoặc nhiều file PDF
+
+     ↓ Khi người dùng upload
+     └──> 4. Hàm `get_vector_store_from_pdfs()` được gọi:
+            └── Gọi `extract_text_from_pdfs()`:
+                 └── Duyệt qua từng file PDF
+                 └── Đọc từng trang → nối thành 1 chuỗi văn bản
+                 └── Trả về list các chuỗi văn bản (1 file = 1 chuỗi)
+            └── Dùng `GoogleGenerativeAIEmbeddings` để vector hóa văn bản
+            └── Tạo vector store FAISS từ các văn bản đã vector hóa
+            └── Cache FAISS để dùng lại mà không cần tính lại vector
+
+     ✅ GIAI ĐOẠN 1 KẾT THÚC —> Lúc này bạn đã có vector store từ tài liệu
+⏳ GIAI ĐOẠN 2: CHATBOT HOẠT ĐỘNG
+
+└──> 5. Hiển thị giao diện Chat (Streamlit chat UI)
+
+└──> 6. Người dùng gõ câu hỏi vào chat_input
+
+     ↓ Khi có câu hỏi:
+     └── Gọi `get_gemini_response(question)`:
+         └── Dùng `vector_store.similarity_search(question, k=2)`
+               → Tìm 2 đoạn văn bản gần nhất với câu hỏi
+         └── Gửi các đoạn đó + câu hỏi vào Gemini qua LangChain QA Chain
+         └── Gemini tạo câu trả lời dựa vào prompt bạn định nghĩa
+         └── Trả về kết quả
+
+└──> 7. Hiển thị câu trả lời của chatbot
+└──> 8. Lưu lại session chat
+
+⛳️ KẾT THÚC 1 VÒNG CHAT – Quay lại bước 6 nếu người dùng hỏi tiếp
+
+      
+      
+        ┌───────────────┐
+        │ Người dùng    │
+        │ upload PDF    │
+        └──────┬────────┘
+               ↓
+      ┌────────────────────┐
+      │ Đọc PDF            │
+      │ Trích xuất văn bản │
+      └────────┬───────────┘
+               ↓
+      ┌────────────────────┐
+      │ Embedding văn bản  │ <─── dùng Gemini Embedding API
+      └────────┬───────────┘
+               ↓
+      ┌────────────────────┐
+      │ Lưu vào FAISS      │ <─── Vector Store
+      └────────────────────┘
+               ↓
+        Người dùng gõ câu hỏi
+               ↓
+      ┌────────────────────┐
+      │ Embed câu hỏi      │
+      └────────┬───────────┘
+               ↓
+      ┌────────────────────┐
+      │ Tìm top K đoạn văn │ <─── FAISS similarity_search
+      └────────┬───────────┘
+               ↓
+      ┌────────────────────────────┐
+      │ Gửi context + câu hỏi vào │
+      │ Gemini LLM để trả lời     │
+      └────────┬──────────────────┘
+               ↓
+      ┌────────────────────┐
+      │ Trả lời hiển thị   │
+      └────────────────────┘
