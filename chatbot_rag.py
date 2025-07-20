@@ -30,7 +30,9 @@ def extract_text_from_google_sheet():
         st.error(f"❌ Lỗi khi parse GOOGLE_CREDENTIALS_JSON: {e}")
         st.stop()
 
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    scope = ['https://spreadsheets.google.com/feeds',
+              'https://www.googleapis.com/auth/drive'
+            ]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SHEET_ID).sheet1

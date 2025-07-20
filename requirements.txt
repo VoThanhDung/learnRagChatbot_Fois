@@ -4,5 +4,7 @@ langchain
 langchain-google-genai
 langchain-community
 python-dotenv
+gspread
+oauth2client
 PyMuPDF
 faiss-cpu
