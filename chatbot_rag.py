@@ -1,69 +1,59 @@
-# chatbot_rag_faiss_required_upload.py
-
 import os
 import streamlit as st
-import fitz  # PyMuPDF
-import google.generativeai as genai
+import gspread
+from dotenv import load_dotenv
+from oauth2client.service_account import ServiceAccountCredentials
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain.chains.question_answering import load_qa_chain
-from dotenv import load_dotenv
+import google.generativeai as genai
 
-# ----------------- 0. Load API Key từ .env -----------------
+# ----------------- 0. Load ENV -----------------
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
-if not GOOGLE_API_KEY:
-    st.error("GOOGLE_API_KEY không tìm thấy trong .env. Vui lòng cấu hình trước.")
+if not GOOGLE_API_KEY or not SHEET_ID:
+    st.error("❌ Thiếu GOOGLE_API_KEY hoặc GOOGLE_SHEET_ID trong file .env")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# ----------------- 1. UI -----------------
-st.set_page_config(page_title="Chatbot Chính sách Công ty", page_icon="🤖")
-st.header("🤖 Chatbot Chính sách Công ty (Powered by Gemini)")
-st.subheader("📄 Vui lòng tải lên file PDF để bắt đầu trò chuyện.")
+# ----------------- 1. Đọc Google Sheet -----------------
+def extract_text_from_google_sheet():
+    creds_file = "gg_config.json"
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SHEET_ID).sheet1
 
-uploaded_files = st.file_uploader("Tải lên các file PDF", type=["pdf"], accept_multiple_files=True)
+    rows = sheet.get_all_values()
+    if len(rows) <= 1:
+        return ["Sheet không có dữ liệu đủ."]
+    
+    texts = [f"Hỏi: {r[0]}\nĐáp: {r[1]}" for r in rows[1:] if len(r) >= 2]
+    return texts
 
-# ----------------- 2. Trích xuất nội dung từ PDF -----------------
-def extract_text_from_pdfs(files):
-    documents = []
-    for file in files:
-        pdf_doc = fitz.open(stream=file.read(), filetype="pdf")
-        text = ""
-        for page in pdf_doc:
-            text += page.get_text()
-        documents.append(text)
-    return documents
-
-# ----------------- 3. Tạo Vector Store -----------------
+# ----------------- 2. Vector Store -----------------
 @st.cache_resource
-def get_vector_store_from_pdfs(files):
-    texts = extract_text_from_pdfs(files)
+def get_vector_store_from_sheet():
+    texts = extract_text_from_google_sheet()
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     return FAISS.from_texts(texts, embeddings)
 
-# Nếu không có file, dừng chương trình
-if not uploaded_files:
-    st.warning("⚠️ Vui lòng upload ít nhất một file PDF để sử dụng chatbot.")
-    st.stop()
+# ----------------- 3. Nút làm mới dữ liệu -----------------
+if st.button("🔄 Làm mới dữ liệu từ Google Sheet"):
+    st.cache_resource.clear()
+    st.success("✅ Dữ liệu đã được làm mới.")
+    st.rerun()
 
-# Tạo vector store từ file đã upload
-vector_store = get_vector_store_from_pdfs(uploaded_files)
-
-# ----------------- 4. Khởi tạo mô hình Gemini & Chain -----------------
+# ----------------- 4. LLM & Prompt -----------------
 llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.2)
 
 prompt_template = """
-Bạn là một trợ lý AI thông minh và thân thiện. Hãy trả lời các câu hỏi dựa trên nội dung của tài liệu được cung cấp dưới đây. 
+Bạn là một trợ lý AI thân thiện và hiểu rõ chính sách công ty. Hãy trả lời rõ ràng, dễ hiểu dựa trên dữ liệu sau:
 
-Nếu thông tin cần thiết không được nêu rõ trong tài liệu, bạn có thể dùng kiến thức chung hoặc suy luận logic từ dữ kiện đã có trong tài liệu để đưa ra câu trả lời hợp lý.
-
-Hãy đảm bảo câu trả lời rõ ràng, mạch lạc, dễ hiểu và chính xác nhất có thể.
-
-Ngữ cảnh:
 {context}
 
 Câu hỏi:
@@ -75,13 +65,13 @@ Trả lời:
 prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
 qa_chain = load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
 
-# ----------------- 5. Hàm trả lời câu hỏi -----------------
-def get_gemini_response(question):
-    docs = vector_store.similarity_search(question, k=4)
-    response = qa_chain({"input_documents": docs, "question": question})
-    return response["output_text"]
+# ----------------- 5. Tạo Vector Store -----------------
+vector_store = get_vector_store_from_sheet()
 
 # ----------------- 6. Giao diện Chat -----------------
+st.set_page_config(page_title="Chatbot Chính sách Công ty", page_icon="🤖")
+st.caption("💡 Dữ liệu được nạp từ Google Sheet chứa thông tin hỏi đáp chính sách.")
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -89,24 +79,17 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("💬 Bạn muốn hỏi gì?"):
+if prompt := st.chat_input("💬 Nhập câu hỏi của bạn..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         with st.spinner("🤔 Đang tìm câu trả lời..."):
-            response = get_gemini_response(prompt)
-            st.markdown(response)
-
-    st.session_state.messages.append({"role": "assistant", "content": response})
-
-# ----------------- 7. Thông tin file đã upload -----------------
-if uploaded_files:
-    st.markdown("---")
-    st.success(f"📚 Đã upload {len(uploaded_files)} file:")
-    for f in uploaded_files:
-        st.markdown(f"- {f.name}")
+            docs = vector_store.similarity_search(prompt, k=4)
+            response = qa_chain({"input_documents": docs, "question": prompt})
+            st.markdown(response["output_text"])
+            st.session_state.messages.append({"role": "assistant", "content": response["output_text"]})
 
 st.markdown("---")
-st.caption("💡 Chatbot này sử dụng Gemini và LangChain để trả lời dựa trên nội dung file PDF bạn đã cung cấp.")
+st.caption("📚 Chatbot sử dụng LangChain + Gemini và dữ liệu từ Google Sheets.")
