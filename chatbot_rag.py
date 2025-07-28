@@ -1,4 +1,5 @@
 import os
+import json
 import streamlit as st
 import gspread
 from dotenv import load_dotenv
@@ -13,20 +14,25 @@ import google.generativeai as genai
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+GOOGLE_CRED = os.getenv("GOOGLE_CREDS_JSON")
 
-if not GOOGLE_API_KEY or not SHEET_ID:
-    st.error("❌ Thiếu GOOGLE_API_KEY hoặc GOOGLE_SHEET_ID trong file .env")
+if not GOOGLE_API_KEY or not SHEET_ID or not GOOGLE_CRED:
+    st.error("❌ Thiếu GOOGLE_API_KEY, GOOGLE_SHEET_ID hoặc GOOGLE_CRED trong file .env")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # ----------------- 1. Đọc Google Sheet -----------------
 def extract_text_from_google_sheet():
-    creds_file = "solar-catfish-466509-p0-3b59f69c0484.json"
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).sheet1
+    try:
+        creds_dict = json.loads(GOOGLE_CRED)
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SHEET_ID).sheet1
+    except Exception as e:
+        st.error(f"❌ Lỗi khi kết nối Google Sheet: {e}")
+        st.stop()
 
     rows = sheet.get_all_values()
     if len(rows) <= 1:
