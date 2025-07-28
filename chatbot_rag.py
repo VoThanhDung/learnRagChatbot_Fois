@@ -12,9 +12,9 @@ import google.generativeai as genai
 
 # ----------------- 0. Load ENV -----------------
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
-GOOGLE_CRED = os.getenv("GOOGLE_CREDS_JSON")
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+SHEET_ID = st.secrets["GOOGLE_SHEET_ID"]
+GOOGLE_CRED = st.secrets["GOOGLE_CRED"]
 
 if not GOOGLE_API_KEY or not SHEET_ID or not GOOGLE_CRED:
     st.error("❌ Thiếu GOOGLE_API_KEY, GOOGLE_SHEET_ID hoặc GOOGLE_CRED trong file .env")
