@@ -37,9 +37,25 @@ def extract_text_from_google_sheet():
     rows = sheet.get_all_values()
     if len(rows) <= 1:
         return ["Sheet không có dữ liệu đủ."]
-    
-    texts = [f"Hỏi: {r[0]}\nĐáp: {r[1]}" for r in rows[1:] if len(r) >= 2]
+
+    texts = []
+    for r in rows[1:]:
+        if len(r) >= 1:
+            main_text = r[0].strip()  # Cột A: nội dung chính
+            # Duyệt qua các cột phụ từ cột B trở đi
+            supplemental_parts = [cell.strip() for cell in r[1:] if cell.strip()]
+            supplemental = "\n".join([f"- {text}" for text in supplemental_parts])
+            
+            if supplemental:
+                combined = f"Nội dung chính: {main_text}\nThông tin bổ sung:\n{supplemental}"
+            else:
+                combined = f"Nội dung chính: {main_text}"
+            texts.append(combined)
+
     return texts
+
+
+
 
 # ----------------- 2. Vector Store -----------------
 @st.cache_resource
@@ -58,8 +74,13 @@ if st.button("🔄 Làm mới dữ liệu từ Google Sheet"):
 llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.2)
 
 prompt_template = """
-Bạn là một trợ lý AI thân thiện và hiểu rõ chính sách công ty. Hãy trả lời rõ ràng, dễ hiểu dựa trên dữ liệu sau:
+Bạn là một trợ lý AI thông minh và thân thiện. Hãy trả lời các câu hỏi dựa trên nội dung của tài liệu được cung cấp dưới đây. 
 
+Nếu thông tin cần thiết không được nêu rõ trong tài liệu, bạn có thể dùng kiến thức chung hoặc suy luận logic từ dữ kiện đã có trong tài liệu để đưa ra câu trả lời hợp lý.
+
+Hãy đảm bảo câu trả lời rõ ràng, mạch lạc, dễ hiểu và chính xác nhất có thể.
+
+Ngữ cảnh:
 {context}
 
 Câu hỏi:
