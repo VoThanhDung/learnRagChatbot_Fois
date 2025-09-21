@@ -1,5 +1,3 @@
-# chatbot_rag_faiss_required_upload.py
-
 import os
 import streamlit as st
 import fitz  # PyMuPDF
@@ -23,35 +21,44 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # ----------------- 1. UI -----------------
 st.set_page_config(page_title="Chatbot Chính sách Công ty", page_icon="🤖")
 st.header("🤖 Chatbot Chính sách Công ty (Powered by Gemini)")
-st.subheader("📄 Vui lòng tải lên file PDF để bắt đầu trò chuyện.")
+st.subheader("📄 Vui lòng tải lên file PDF hoặc TXT để bắt đầu trò chuyện.")
 
-uploaded_files = st.file_uploader("Tải lên các file PDF", type=["pdf"], accept_multiple_files=True)
+uploaded_files = st.file_uploader(
+    "Tải lên các file PDF hoặc TXT",
+    type=["pdf", "txt"],
+    accept_multiple_files=True
+)
 
-# ----------------- 2. Trích xuất nội dung từ PDF -----------------
-def extract_text_from_pdfs(files):
+# ----------------- 2. Trích xuất nội dung từ PDF/TXT -----------------
+def extract_text_from_files(files):
     documents = []
     for file in files:
-        pdf_doc = fitz.open(stream=file.read(), filetype="pdf")
-        text = ""
-        for page in pdf_doc:
-            text += page.get_text()
-        documents.append(text)
+        if file.type == "application/pdf":  # Nếu là PDF
+            pdf_doc = fitz.open(stream=file.read(), filetype="pdf")
+            text = ""
+            for page in pdf_doc:
+                text += page.get_text()
+            documents.append(text)
+        elif file.type == "text/plain":  # Nếu là TXT
+            text = file.read().decode("utf-8", errors="ignore")  # đọc file txt
+            documents.append(text)
     return documents
 
 # ----------------- 3. Tạo Vector Store -----------------
 @st.cache_resource
-def get_vector_store_from_pdfs(files):
-    texts = extract_text_from_pdfs(files)
+def get_vector_store_from_files(files):
+    texts = extract_text_from_files(files)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    # Gộp tất cả văn bản lại thành một vector store
     return FAISS.from_texts(texts, embeddings)
 
 # Nếu không có file, dừng chương trình
 if not uploaded_files:
-    st.warning("⚠️ Vui lòng upload ít nhất một file PDF để sử dụng chatbot.")
+    st.warning("⚠️ Vui lòng upload ít nhất một file PDF hoặc TXT để sử dụng chatbot.")
     st.stop()
 
-# Tạo vector store từ file đã upload
-vector_store = get_vector_store_from_pdfs(uploaded_files)
+# Tạo vector store từ toàn bộ file đã upload
+vector_store = get_vector_store_from_files(uploaded_files)
 
 # ----------------- 4. Khởi tạo mô hình Gemini & Chain -----------------
 llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.2)
@@ -109,4 +116,4 @@ if uploaded_files:
         st.markdown(f"- {f.name}")
 
 st.markdown("---")
-st.caption("💡 Chatbot này sử dụng Gemini và LangChain để trả lời dựa trên nội dung file PDF bạn đã cung cấp.")
+st.caption("💡 Chatbot này sử dụng Gemini và LangChain để trả lời dựa trên nội dung file PDF/TXT bạn đã cung cấp.")
